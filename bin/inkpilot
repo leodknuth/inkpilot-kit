@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+/**
+ * InkPilot (墨图) 零依赖轻量 CLI（Node.js 20+）
+ * 直接与本机 InkPilot 服务（$INKPILOT_API 或 http://127.0.0.1:4310）通信。
+ */
+import fs from 'node:fs'
+
+const API = (process.env.INKPILOT_API || process.env.AGENT_TLDRAW_URL || `http://127.0.0.1:${process.env.AGENT_TLDRAW_PORT || 4310}`).replace(/\/+$/, '')
+
+async function request(method, pathname, body) {
+	const res = await fetch(`${API}${pathname}`, {
+		method,
+		headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+		body: body !== undefined ? JSON.stringify(body) : undefined,
+	})
+	const text = await res.text()
+	let data = text
+	try {
+		data = JSON.parse(text)
+	} catch {
+		// keep raw text
+	}
+	if (!res.ok) {
+		const msg = typeof data === 'object' && data && data.error ? data.error : `${res.status} ${res.statusText}`
+		throw new Error(msg)
+	}
+	return data
+}
+
+function print(data) {
+	if (typeof data === 'string') {
+		process.stdout.write(data.endsWith('\n') ? data : `${data}\n`)
+		return
+	}
+	if (data && typeof data === 'object' && typeof data.markdown === 'string') {
+		process.stdout.write(data.markdown.endsWith('\n') ? data.markdown : `${data.markdown}\n`)
+		return
+	}
+	process.stdout.write(`${JSON.stringify(data, null, 2)}\n`)
+}
+
+function usage() {
+	console.log(`InkPilot CLI (API: ${API})
+
+Usage:
+  inkpilot health                                 Check server status & active file
+  inkpilot files                                  List workspace .tldr projects
+  inkpilot brief [selection|page]                 Fetch token-efficient Markdown brief
+  inkpilot context [pageId]                       Fetch structured canvas context JSON
+  inkpilot tree <projectDir>                      List project artifacts/ tree
+  inkpilot read-artifact <relPath>                Read external Markdown/text artifact
+  inkpilot write-artifact <relPath> [--content S] Write artifact (reads stdin if --content omitted)
+  inkpilot resolve <inkpilot://...>               Resolve an InkPilot resource URI
+  inkpilot open <inkpilot://...>                  Focus InkPilot UI on a resource URI
+  inkpilot comments                               List spatial comment threads
+  inkpilot git-log                                Inspect Git history for active canvas
+  inkpilot propose '<JSON actions>' [--summary S] Submit reviewable Diff proposal
+  inkpilot status <proposalId>                    Check proposal review status
+  inkpilot docs                                   Print live /docs, /openapi.json & /mcp URLs`)
+}
+
+async function main() {
+	const [cmd, ...rest] = process.argv.slice(2)
+	if (!cmd || cmd === '-h' || cmd === '--help' || cmd === 'help') {
+		usage()
+		return
+	}
+	if (cmd === 'health') return print(await request('GET', '/health'))
+	if (cmd === 'files') return print(await request('GET', '/api/files'))
+	if (cmd === 'brief') {
+		const scope = rest[0] === 'selection' ? 'selection' : 'page'
+		return print(await request('GET', `/api/canvas/brief?scope=${scope}`))
+	}
+	if (cmd === 'context') {
+		const qs = rest[0] ? `?pageId=${encodeURIComponent(rest[0])}` : ''
+		return print(await request('GET', `/api/canvas/context${qs}`))
+	}
+	if (cmd === 'tree' && rest[0]) {
+		return print(await request('GET', `/api/projects/tree?projectDir=${encodeURIComponent(rest[0])}`))
+	}
+	if (cmd === 'read-artifact' && rest[0]) {
+		return print(await request('GET', `/api/artifacts/content?path=${encodeURIComponent(rest[0])}`))
+	}
+	if (cmd === 'write-artifact' && rest[0]) {
+		const idx = rest.indexOf('--content')
+		const content = idx !== -1 ? (rest[idx + 1] ?? '') : fs.readFileSync(0, 'utf8')
+		return print(await request('PUT', '/api/artifacts/content', { path: rest[0], content }))
+	}
+	if (cmd === 'resolve' && rest[0]) {
+		return print(await request('GET', `/api/canvas/resource?uri=${encodeURIComponent(rest[0])}`))
+	}
+	if (cmd === 'open' && rest[0]) {
+		return print(await request('POST', '/api/workspace/open-uri', { uri: rest[0] }))
+	}
+	if (cmd === 'comments') return print(await request('GET', '/api/comments'))
+	if (cmd === 'git-log') return print(await request('GET', '/api/git/history'))
+	if (cmd === 'status' && rest[0]) {
+		return print(await request('GET', `/api/proposals/${encodeURIComponent(rest[0])}`))
+	}
+	if (cmd === 'propose' && rest[0]) {
+		const actions = JSON.parse(rest[0])
+		const idx = rest.indexOf('--summary')
+		const summary = idx !== -1 && rest[idx + 1] ? rest[idx + 1] : 'CLI proposal'
+		return print(await request('POST', '/api/proposals', { source: 'cli-agent', summary, actions }))
+	}
+	if (cmd === 'docs') {
+		console.log(`Docs:    ${API}/docs\nOpenAPI: ${API}/openapi.json\nMCP:     ${API}/mcp`)
+		return
+	}
+	usage()
+	process.exitCode = 1
+}
+
+main().catch((err) => {
+	console.error(`inkpilot: ${err instanceof Error ? err.message : String(err)}`)
+	process.exit(1)
+})
