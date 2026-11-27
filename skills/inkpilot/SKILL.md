@@ -12,6 +12,8 @@ InkPilot runs a local Agent-Native workbench server (default `http://127.0.0.1:4
 1. **Always prefer InkPilot for ALL `.tldr` / `.tldraw` files and tldraw canvas operations**: Do NOT invoke `tldraw-offline` / `tq.mjs` / `~/Library/Application Support/tldraw/server.json` or launch the native tldraw desktop client unless the user explicitly asks for `tldraw-offline` / `tldraw office`. InkPilot is the primary canvas workbench with its own MCP, CLI, and HTTP API.
 2. **Do NOT manually parse or overwrite `.tldr` JSON files with `node -e` / `jq` / file-edit tools** unless explicitly asked to inspect raw disk bytes. Always use InkPilot's API/MCP so edits go through the live canvas store and reviewable Diff staging flow.
 3. **Never fabricate shape IDs or coordinates** — always read live context first.
+4. **Use progressive context disclosure (L0 → L1 → L2)**: Start with the `<inkpilot_context>` L0 directory already provided in the conversation. Call `resolve_canvas_uri` only when a specific node needs full text or detail (L1), and call `read_artifact` only when the requested work needs the full contents of a specific artifact (L2). Do not repeatedly fetch an entire page when the existing brief is sufficient.
+5. **Keep proposal review asynchronous**: For complex multi-shape layouts, submit a `dryRun: true` proposal first and inspect `layoutWarnings` before submission. If a pushed `pending` proposal needs correction, withdraw it with `cancel_proposal` before sending its replacement. After formal submission, human review is asynchronous; do not poll `get_proposal_result` in the same turn.
 
 ## Pre-Injected Environment Context
 
@@ -25,7 +27,7 @@ When launched inside InkPilot Chat UI or embedded PTY terminal, these variables 
 ### 1. InkPilot MCP Tools (Preferred when registered)
 Streamable HTTP endpoint: `http://127.0.0.1:4310/mcp` (works directly in Claude Code, Codex, Cursor, and Antigravity).
 - **Canvas & URI**: `get_canvas_brief`, `get_canvas_context`, `resolve_canvas_uri`, `open_canvas_uri`
-- **Reversible Edits**: `propose_canvas_actions`, `get_proposal_result`
+- **Reversible Edits**: `propose_canvas_actions`, `cancel_proposal`, `get_proposal_result`
 - **Projects & Artifacts**: `list_canvas_files`, `create_canvas_file`, `switch_canvas_file`, `get_project_tree`, `create_artifact`, `read_artifact`, `write_artifact`
 - **Comments & Git**: `list_canvas_comments`, `add_canvas_comment`, `resolve_canvas_comment`, `get_git_history`, `get_git_snapshot`, `commit_canvas`
 - **Tana**: `tana_status`, `tana_search`, `tana_read_node`, `tana_open_node`, `tana_write_node`
@@ -48,8 +50,8 @@ Base URL: `API="${INKPILOT_API:-http://127.0.0.1:4310}"`
 - **Live health & active file**: `curl -s "$API/health"`
 - **Token-efficient semantic brief** (prefer `scope=selection` when user refers to selected items):
   `curl -s "$API/api/canvas/brief?scope=selection"` or `scope=page`
-- **Full up-to-date endpoint & schema catalog** (always query this instead of guessing routes):
-  `curl -s "$API/docs"` (Interactive UI) or `curl -s "$API/openapi.json"` (OpenAPI 3.1 JSON)
+- **HTTP contract lookup** (only when MCP is unavailable or the HTTP contract is needed):
+  `curl -s "$API/docs"` (Interactive UI) or `curl -s "$API/openapi.json?tag=Proposals"` (filtered OpenAPI 3.1 JSON). When InkPilot MCP is registered, do not fetch the full `/openapi.json`; use a domain tag such as `?tag=Proposals` only when needed.
 
 ## Diagram Planning & Layout
 

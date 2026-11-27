@@ -56,6 +56,7 @@ Usage:
   inkpilot git-log                                Inspect Git history for active canvas
   inkpilot propose '<JSON actions>' [--summary S] Submit reviewable Diff proposal
   inkpilot status <proposalId>                    Check proposal review status
+  inkpilot cancel <proposalId>                    Withdraw pending proposal
   inkpilot docs                                   Print live /docs, /openapi.json & /mcp URLs`)
 }
 
@@ -95,7 +96,10 @@ async function main() {
 	if (cmd === 'comments') return print(await request('GET', '/api/comments'))
 	if (cmd === 'git-log') return print(await request('GET', '/api/git/history'))
 	if (cmd === 'status' && rest[0]) {
-		return print(await request('GET', `/api/proposals/${encodeURIComponent(rest[0])}`))
+		return print(await request('GET', `/api/staging/status/${encodeURIComponent(rest[0])}`))
+	}
+	if (cmd === 'cancel' && rest[0]) {
+		return print(await request('POST', `/api/proposals/${encodeURIComponent(rest[0])}/cancel`))
 	}
 	if (cmd === 'propose' && rest[0]) {
 		const actions = JSON.parse(rest[0])
