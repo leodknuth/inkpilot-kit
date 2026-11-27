@@ -27,7 +27,7 @@ When launched inside InkPilot Chat UI or embedded PTY terminal, these variables 
 ### 1. InkPilot MCP Tools (Preferred when registered)
 Streamable HTTP endpoint: `http://127.0.0.1:4310/mcp` (works directly in Claude Code, Codex, Cursor, and Antigravity).
 - **Canvas & URI**: `get_canvas_brief`, `get_canvas_context`, `resolve_canvas_uri`, `open_canvas_uri`
-- **Reversible Edits**: `propose_canvas_actions`, `cancel_proposal`, `get_proposal_result`
+- **Reversible Edits**: `propose_canvas_actions`, `get_pending_diff`, `set_diff_decisions`, `apply_proposal`, `cancel_proposal`, `get_proposal_result`
 - **Projects & Artifacts**: `list_canvas_files`, `create_canvas_file`, `switch_canvas_file`, `get_project_tree`, `create_artifact`, `read_artifact`, `write_artifact`
 - **Comments & Git**: `list_canvas_comments`, `add_canvas_comment`, `resolve_canvas_comment`, `get_git_history`, `get_git_snapshot`, `commit_canvas`
 - **Tana**: `tana_status`, `tana_search`, `tana_read_node`, `tana_open_node`, `tana_write_node`

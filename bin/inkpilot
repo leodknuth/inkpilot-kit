@@ -55,6 +55,8 @@ Usage:
   inkpilot comments                               List spatial comment threads
   inkpilot git-log                                Inspect Git history for active canvas
   inkpilot propose '<JSON actions>' [--summary S] Submit reviewable Diff proposal
+  inkpilot pending                                Inspect pending Diff items
+  inkpilot apply <proposalId>                     Apply pending Diff to canvas
   inkpilot status <proposalId>                    Check proposal review status
   inkpilot cancel <proposalId>                    Withdraw pending proposal
   inkpilot docs                                   Print live /docs, /openapi.json & /mcp URLs`)
@@ -95,6 +97,13 @@ async function main() {
 	}
 	if (cmd === 'comments') return print(await request('GET', '/api/comments'))
 	if (cmd === 'git-log') return print(await request('GET', '/api/git/history'))
+	if (cmd === 'pending') {
+		const qs = rest[0] ? `?filePath=${encodeURIComponent(rest[0])}` : ''
+		return print(await request('GET', `/api/proposals/pending${qs}`))
+	}
+	if (cmd === 'apply' && rest[0]) {
+		return print(await request('POST', `/api/proposals/${encodeURIComponent(rest[0])}/apply`, {}))
+	}
 	if (cmd === 'status' && rest[0]) {
 		return print(await request('GET', `/api/staging/status/${encodeURIComponent(rest[0])}`))
 	}
